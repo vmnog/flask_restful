@@ -1,5 +1,5 @@
 from flask import Flask, request
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api, reqparse
 from flask_jwt import JWT, jwt_required
 from security import authenticate, identity
 
@@ -13,6 +13,16 @@ items = []
 
 
 class Item(Resource):
+    parser = reqparse.RequestParser()  # run the request and see what params matches
+    parser.add_argument(  # validating request.body params
+        'price',
+        type=float,
+        required=True,
+        help="Price is required",
+    )
+    data = parser.parse_args()  # put valid params into data
+    data = request.get_json()
+
     @jwt_required()  # makes get methods/routes jwt required
     def get(self, name):
         # 'next' returns a list if necessary or None
@@ -25,10 +35,10 @@ class Item(Resource):
         if next(filter(lambda x: x['name'] == name, items), None):
             return {'message': "Item {} already exists.".format(name)}, 400
 
-        data = request.get_json()
+        data = Item.parser.parse_args()
+
         item = {'name': name, 'price': data['price']}
-        items.append(item)
-        return item, 201
+        return item
 
     def delete(self, name):
         global items  # forces that items var is the item list we declared @ 12l
@@ -37,9 +47,10 @@ class Item(Resource):
 
     @jwt_required()
     def put(self, name):  # creates or updates if doesn't exists
-        data = request.get_json()
+        data = Item.parser.parse_args()
         # return if find or None if dont
         item = next(filter(lambda x: x['name'] == name, items), None)
+
         if item is None:
             item = {'name': name, 'price': data['price']}
             items.append(item)
